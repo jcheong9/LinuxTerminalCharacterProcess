@@ -57,11 +57,13 @@ void parent (int p[2])
 	int nread;
 	char buf[MSGSIZE];
 
-	close (p[1]);    /* close the write descriptor */
+	/* close the read descriptor */
+	close (p[0]);    
+	system("stty raw igncr -echo");
 
 	for (;;)
 	{
-		switch (nread = read(p[0], buf, MSGSIZE))
+		switch (nread = write(p[1], buf, MSGSIZE))
 		{
 			case -1:
 			case 0:
@@ -84,16 +86,17 @@ void parent (int p[2])
 void child (int p[2])
 {
 	int count;
-
-	close (p[0]);    /* close the read descriptor */
+	
+	close (p[1]);    /* close the write descriptor */
 
 	for (count = 0; count < 3; count ++)
 	{
-		write (p[1], msg1, MSGSIZE);
+		read (p[0], msg1, MSGSIZE);
 		sleep (3);
 	}
 	/*--- Send final message ------------*/
 	write (p[1], msg2, MSGSIZE);
+	system("stty -raw -igncr echo");
 	exit(0);
 }
 
