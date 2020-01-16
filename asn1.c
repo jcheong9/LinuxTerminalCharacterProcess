@@ -1,55 +1,109 @@
-/*********************************************************************
-* Simple program that creates two processes, both parent and child
-* output their respective PIDs
-**********************************************************************/
-
 #include <stdio.h>
-#include <unistd.h>
-#include <sys/types.h>
 #include <stdlib.h>
-#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <signal.h>
 
-int inputProcess(char ch);
+#define MSGSIZE 16
 
-int main(void) 
+char *msg1 = "Hello World #1";
+char *msg2 = "Hello World #2";
+char *msg3 = "Hello World #3";
+
+/*------ Function prototypes ----------*/
+void inputProcess(int p[]);
+void outputProcess(int p[]);
+void translateProcess(int p[]);
+void parent (int p[]);
+void child (int p[]);
+void fatal (char *);
+
+/*------- Message Strings -------------*/
+char *msg1 = "Hello World";
+char *msg2 = "Goodbye World";
+
+int main (void)
 {
-	pid_t childpid = 0; 
-   	int i, n;
-	char ch = 'k';
-	char buf[] = "";
+	int pfd[2];
 
-   	n = 3;  
-   	for (i = 1; i < n; i++)
-      		if ((childpid = fork()) > 0)
-         		break;
+	/*----- Open the pipe -----------*/
+	if (pipe(pfd) < 0)
+	{
+		fatal ("pipe call");
+		exit(1);
+	}
 
-	//f((long)childpid == 0){
-		system("stty raw igncr -echo");
-		while(ch !='T'){
-			scanf("%c",&ch);
-			strncat(buf, &ch, 1); 
-			
-		} 
-		system("stty -raw -igncr echo");
-		printf("Appended String: %s\n", buf); 	
-	//}
+	/*---- Set the O_NDELAY flag for p[0] -----------*/
+	if (fcntl (pfd[0], F_SETFL, O_NDELAY) < 0)
+	  	fatal ("fcntl call");
 
-   	fprintf(stderr, "i:%d  process ID:%ld  parent ID:%ld  child ID:%ld\n",
-           i, (long)getpid(), (long)getppid(), (long)childpid);
+	/*-------- fork ---------------*/
 
-   	return 0; 
+	switch(fork())
+	{
+		case -1:        /* error */
+			fatal ("fork call");
+		case 0:        /* It's the child */
+		  	child (pfd);
+		default:       /* parent */
+		  	parent (pfd);
+	}
 }
 
-int inputProcess(char ch){
+/*------- Parent Code -------*/
+void parent (int p[2])
+{
+	int nread;
+	char buf[MSGSIZE];
 
-	char buf[] = "";
+	close (p[1]);    /* close the write descriptor */
 
-	while(ch !='T'){
-		scanf("%c",&ch);
-		strncat(buf, &ch, 1); 
-		
-	} 
-
-	printf("Appended String: %s\n", buf); 	
-	return 0;
+	for (;;)
+	{
+		switch (nread = read(p[0], buf, MSGSIZE))
+		{
+			case -1:
+			case 0:
+				printf ("(pipe empty)\n");
+				sleep(1);
+				break;
+			default:
+			  if (strcmp (buf, msg2) == 0)
+			  {
+				  printf ("End of Conversation\n");
+				  exit(0);
+			  }
+			else
+				printf ("MSG = %s\n", buf);
+		}
+	}
 }
+
+/*------ Child Code --------------------*/
+void child (int p[2])
+{
+	int count;
+
+	close (p[0]);    /* close the read descriptor */
+
+	for (count = 0; count < 3; count ++)
+	{
+		write (p[1], msg1, MSGSIZE);
+		sleep (3);
+	}
+	/*--- Send final message ------------*/
+	write (p[1], msg2, MSGSIZE);
+	exit(0);
+}
+
+/*---------- Error function ------*/
+void fatal (char *s)
+{
+	perror (s);    /* print error msg and die */
+	exit(1);
+}
+
+
+
+
