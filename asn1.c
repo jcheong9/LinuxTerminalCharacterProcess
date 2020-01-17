@@ -6,12 +6,8 @@
 #include <signal.h>
 #include <string.h>
 
-#define MSGSIZE 16
-/*
-char *msg1 = "Hello World #1";
-char *msg2 = "Hello World #2";
-char *msg3 = "Hello World #3";
-*/
+#define MSGSIZE 256
+#define abNormTermination 0x0B
 
 /*------ Function prototypes ----------*/
 void inputProcess(int p[]);
@@ -39,7 +35,6 @@ int main (void)
 	  	fatal ("fcntl call");
 
 	/*-------- fork ---------------*/
-
 	switch(fork())
 	{
 		case -1:        /* error */
@@ -56,6 +51,7 @@ void parent (int p[2])
 {
 	char ch;
 	char buf[] = "";
+	char newLine = '\n';
 	//char *contStr;
 
 	close (p[0]);    /* close the read descriptor */
@@ -65,17 +61,20 @@ void parent (int p[2])
 		if(scanf("%c",&ch) == 1){
 			strncat(buf, &ch, 1); 
 			if(ch == 'E'){
-				//contStr = buf;
+				strncat(buf, &newLine, 1); 
 				write (p[1], buf, MSGSIZE);
+				strcpy(buf,"");
+			}
+			if(ch == abNormTermination){
+				kill(0,9);
 			}
 		}
+		printf("Appended String: %s\n", buf); 
 		
-
-
 	}
 	/*--- Send final message ------------*/
 	//write (p[1], msg2, MSGSIZE);
-	printf("Appended String: %s\n", buf); 	
+		
 	exit(0);
 }
 
@@ -93,7 +92,6 @@ void child (int p[2])
 		{
 		  case -1:
 		  case 0:
-			printf ("(pipe empty)\n");
 			sleep(1);
 		  break;
 		default:
