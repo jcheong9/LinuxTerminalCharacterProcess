@@ -6,8 +6,9 @@
 #include <signal.h>
 #include <string.h>
 
-#define MSGSIZE 256
-#define abNormTermination 0x0B
+#define MSGSIZE 			256
+#define abNormTermination 	0x0B
+#define endOfString   		00
 
 /*------ Function prototypes ----------*/
 void inputProcess(int p[]);
@@ -49,31 +50,33 @@ int main (void)
 /*------- Parent Code -------*/
 void parent (int p[2])
 {
-	char ch;
-	char buf[] = "";
-	char newLine = '\n';
-	//char *contStr;
+	char readInput;
+	char buf[MSGSIZE];
+
+	int i = 0;
 
 	close (p[0]);    /* close the read descriptor */
 	system("stty raw igncr -echo");
 	while (1)
 	{
-		if(scanf("%c",&ch) == 1){
-			strncat(buf, &ch, 1); 
-			if(ch == 'E'){
-				strncat(buf, &newLine, 1); 
+		switch(readInput = getchar()){
+			
+			case 'E':
+				buf[i++] = endOfString;
 				write (p[1], buf, MSGSIZE);
-				strcpy(buf,"");
-			}
-			if(ch == abNormTermination){
+				i = 0;
+				break;
+			case abNormTermination:
 				kill(0,9);
-			}
+				break;
+			default:
+				buf[i++] = readInput;
+				break;
+
 		}
-		printf("Appended String: %s\n", buf); 
+		
 		
 	}
-	/*--- Send final message ------------*/
-	//write (p[1], msg2, MSGSIZE);
 		
 	exit(0);
 }
