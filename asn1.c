@@ -4,12 +4,14 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <string.h>
 
 #define MSGSIZE 16
-
+/*
 char *msg1 = "Hello World #1";
 char *msg2 = "Hello World #2";
 char *msg3 = "Hello World #3";
+*/
 
 /*------ Function prototypes ----------*/
 void inputProcess(int p[]);
@@ -19,9 +21,7 @@ void parent (int p[]);
 void child (int p[]);
 void fatal (char *);
 
-/*------- Message Strings -------------*/
-char *msg1 = "Hello World";
-char *msg2 = "Goodbye World";
+
 
 int main (void)
 {
@@ -54,50 +54,53 @@ int main (void)
 /*------- Parent Code -------*/
 void parent (int p[2])
 {
-	int nread;
-	char buf[MSGSIZE];
+	char ch;
+	char buf[] = "";
+	//char *contStr;
 
-	/* close the read descriptor */
-	close (p[0]);    
+	close (p[0]);    /* close the read descriptor */
 	system("stty raw igncr -echo");
-
-	for (;;)
+	while (1)
 	{
-		switch (nread = write(p[1], buf, MSGSIZE))
-		{
-			case -1:
-			case 0:
-				printf ("(pipe empty)\n");
-				sleep(1);
-				break;
-			default:
-			  if (strcmp (buf, msg2) == 0)
-			  {
-				  printf ("End of Conversation\n");
-				  exit(0);
-			  }
-			else
-				printf ("MSG = %s\n", buf);
+		if(scanf("%c",&ch) == 1){
+			strncat(buf, &ch, 1); 
+			if(ch == 'E'){
+				//contStr = buf;
+				write (p[1], buf, MSGSIZE);
+			}
 		}
+		
+
+
 	}
+	/*--- Send final message ------------*/
+	//write (p[1], msg2, MSGSIZE);
+	printf("Appended String: %s\n", buf); 	
+	exit(0);
 }
 
 /*------ Child Code --------------------*/
 void child (int p[2])
 {
-	int count;
-	
+	int nread;
+	char buf[MSGSIZE];
+
 	close (p[1]);    /* close the write descriptor */
 
-	for (count = 0; count < 3; count ++)
+	while(1)
 	{
-		read (p[0], msg1, MSGSIZE);
-		sleep (3);
+		switch (nread = read(p[0], buf, MSGSIZE))
+		{
+		  case -1:
+		  case 0:
+			printf ("(pipe empty)\n");
+			sleep(1);
+		  break;
+		default:
+			printf ("MSG = %s\n", buf);
+		}
 	}
-	/*--- Send final message ------------*/
-	write (p[1], msg2, MSGSIZE);
 	system("stty -raw -igncr echo");
-	exit(0);
 }
 
 /*---------- Error function ------*/
