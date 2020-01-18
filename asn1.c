@@ -60,8 +60,7 @@ int main (void)
 		default:       /* parent */
 		  	inputProcess (pfd, pid, ppid);
 	}
-
-	exit(0);
+	return 0;
 }
 
 
@@ -69,12 +68,12 @@ void inputProcess (int p[2],pid_t pid,pid_t ppid)
 {
 	char readInput;
 	char buf[MSGSIZE];
-
+	int read = 1;
 	int i = 0;
 
 	close (p[0]);    /* close the read descriptor */
 	system("stty raw igncr -echo");
-	while (!normalTermination)
+	while (read)
 	{
 		switch(readInput = getchar()){
 			
@@ -88,6 +87,7 @@ void inputProcess (int p[2],pid_t pid,pid_t ppid)
 				buf[i++] = endOfString;
 				write (p[1], buf, MSGSIZE);
 				i = 0;
+				read = 0;
 				kill(pid,SIGUSR1);
 				break;
 			case abNormTermination:
@@ -100,8 +100,8 @@ void inputProcess (int p[2],pid_t pid,pid_t ppid)
 		}
 
 	}
-	printf("Terminate Parent Process.\n");	
 	system("stty -raw -igncr echo");
+	//printf("Terminate Parent Process.\n");	
 	exit(0);
 }
 
@@ -125,8 +125,8 @@ void outputProcess (int p[2])
 			printf ("MSG = %s\n", buf);
 		}
 	}
-	printf("SIGUSR1 received.\n");
-	system("stty -raw -igncr echo");
+	//printf("SIGUSR1 received.\n");
+	//system("stty -raw -igncr echo");
 }
 
 /*---------- Error function ------*/
