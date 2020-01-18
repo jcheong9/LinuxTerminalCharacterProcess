@@ -74,8 +74,7 @@ void parent (int p[2])
 				break;
 
 		}
-		
-		
+
 	}
 		
 	exit(0);
