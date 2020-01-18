@@ -19,13 +19,13 @@ void child (int p[]);
 void fatal (char *);
 void sig_usr(int signo);
 
-static int received = 0;
+static int normalTermination = 0;
 
 void readUsual(int sig)
 {
     if (sig == SIGUSR1)
     {
-        received = 1;
+        normalTermination = 1;
     }
 }
 
@@ -60,6 +60,8 @@ int main (void)
 		default:       /* parent */
 		  	inputProcess (pfd, pid, ppid);
 	}
+
+	exit(0);
 }
 
 
@@ -72,12 +74,13 @@ void inputProcess (int p[2],pid_t pid,pid_t ppid)
 
 	close (p[0]);    /* close the read descriptor */
 	system("stty raw igncr -echo");
-	while (1)
+	while (!normalTermination)
 	{
 		switch(readInput = getchar()){
 			
 			case 'E':
 				buf[i++] = endOfString;
+				buf[i++] = '\n';
 				write (p[1], buf, MSGSIZE);
 				i = 0;
 				break;
@@ -86,11 +89,8 @@ void inputProcess (int p[2],pid_t pid,pid_t ppid)
 				write (p[1], buf, MSGSIZE);
 				i = 0;
 				kill(pid,SIGUSR1);
-				sleep(1);
-				kill(ppid, SIGKILL);
 				break;
 			case abNormTermination:
-				system("stty -raw -igncr echo");
 				kill(0,9);
 				break;
 			default:
@@ -100,7 +100,8 @@ void inputProcess (int p[2],pid_t pid,pid_t ppid)
 		}
 
 	}
-		
+	printf("Terminate Parent Process.\n");	
+	system("stty -raw -igncr echo");
 	exit(0);
 }
 
@@ -112,7 +113,7 @@ void outputProcess (int p[2])
 
 	close (p[1]);    /* close the write descriptor */
 
-	while(!received)
+	while(!normalTermination)
 	{
 		switch (nread = read(p[0], buf, MSGSIZE))
 		{
