@@ -223,11 +223,12 @@ void translateProcess(int pipeIT[2],int pipeOT[2])
 						case 'X':
 							j = (j > 0) ? j - 1 : 0;
 							break;
+						case 'K':
+							j=0;
+							break;
 						default:
 							
 							bufTranslate[j++] = buf[i];
-							//printf ("%s", bufTranslate);
-							
 							break;			
 
 					}
