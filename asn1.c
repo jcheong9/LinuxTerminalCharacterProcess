@@ -25,10 +25,8 @@
 -- PROGRAMMER: Jameson Cheong
 --
 -- NOTES:
--- This simple  program  will  get  the  canonical  name,
--- aliases,  and  '.'  separated  Internet IP addresses for a
--- given destination host using the window socket. 
--- 
+-- A simple program that uses fork, pipe and signals to read and process characters entered on a terminal keyboard.
+-- Output and translate processes are child of input process. 
 ----------------------------------------------------------------------------------------------------------------------*/
 #include "asn1.h"
 
@@ -39,7 +37,7 @@ int main (void)
 	int pipeOT[2];	//pipe for output and translate process
 	pid_t pOutputid, pTranslateid;
 
-	signal(SIGUSR1,readUsual);
+	signal(SIGUSR1,readUsual); //signal to change normalTermination
 	
 	system("stty raw igncr -echo"); //disable keyboard functionality
 	
@@ -314,15 +312,50 @@ void translateProcess(int pipeIT[2],int pipeOT[2])
 	}
 
 }
-
-/*---------- Error function ------*/
+/*------------------------------------------------------------------------------------------------------------------
+-- FUNCTION: fatal
+--
+-- DATE: January 15, 2020
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Jameson Cheong
+--
+-- PROGRAMMER: Jameson Cheong
+--
+-- INTERFACE: void fatal (char *s)
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function printes the error message and terminates the program.
+--
+----------------------------------------------------------------------------------------------------------------------*/
 void fatal (char *s)
 {
 	perror (s);    /* print error msg and die */
 	exit(1);
 }
 
-
+/*------------------------------------------------------------------------------------------------------------------
+-- FUNCTION: readUsual
+--
+-- DATE: January 15, 2020
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Jameson Cheong
+--
+-- PROGRAMMER: Jameson Cheong
+--
+-- INTERFACE: void fatal (char *s)
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function sets the normalTermination to true. This will end the loop in output and translate processes.
+--
+----------------------------------------------------------------------------------------------------------------------*/
 void readUsual(int sig)
 {
     if (sig == SIGUSR1)
