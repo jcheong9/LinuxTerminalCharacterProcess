@@ -1,32 +1,36 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <string.h>
 
-#define MSGSIZE 		256
-#define abNormTermination 	0x0B
 
-/*------ Function prototypes ----------*/
-void inputProcess(int pipeIO[], int pipeIT[], pid_t pIOid, pid_t pITid);
-void outputProcess(int pipeIO[],int pipeOT[]);
-void translateProcess(int pipeIT[],int pipeOT[]);
-void parent (int p[]);
-void child (int p[]);
-void fatal (char *);
-void sig_usr(int signo);
-
-static int normalTermination = 0;
-
-void readUsual(int sig)
-{
-    if (sig == SIGUSR1)
-    {
-        normalTermination = 1;
-    }
-}
+/*------------------------------------------------------------------------------------------------------------------
+-- SOURCE FILE: asn1.cpp -	A simple program that uses fork, pipe and signals to read and process characters 
+--				entered on a terminal keyboard.
+--
+--
+-- PROGRAM: Linux Process Application
+--
+-- FUNCTIONS:
+--		int main (void)
+--		void inputProcess (int pipeIO[2], int pipeIT[2],pid_t pIOid, pid_t pITid)
+--		void outputProcess(int pipeIO[],int pipeOT[])
+--		void translateProcess(int pipeIT[2],int pipeOT[2])
+--		void fatal (char *s)
+--		void readUsual(int sig)
+--		
+--
+-- DATE: January 15, 2020
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Jameson Cheong
+--
+-- PROGRAMMER: Jameson Cheong
+--
+-- NOTES:
+-- This simple  program  will  get  the  canonical  name,
+-- aliases,  and  '.'  separated  Internet IP addresses for a
+-- given destination host using the window socket. 
+-- 
+----------------------------------------------------------------------------------------------------------------------*/
+#include "asn1.h"
 
 int main (void)
 {
@@ -62,7 +66,7 @@ int main (void)
 			break;
 
 		case 0:        /* It's the child */
-		  	outputProcess (pipeIO, pipeOT);
+		  	outputProcess (pipeIO, pipeOT);  //output process is created
 		default:       /* parent */
 		  	
 			pTranslateid = fork(); 
@@ -73,7 +77,7 @@ int main (void)
 					break;
 
 				case 0:        /* It's the child */
-				  	translateProcess (pipeIT, pipeOT);
+				  	translateProcess (pipeIT, pipeOT);  //translate process is created
 				default:       /* parent */
 					inputProcess (pipeIO, pipeIT, pOutputid, pTranslateid);
 			}
@@ -83,7 +87,28 @@ int main (void)
 	return 0;
 }
 
-
+/*------------------------------------------------------------------------------------------------------------------
+-- FUNCTION: inputProcess
+--
+-- DATE: January 15, 2020
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Jameson Cheong
+--
+-- PROGRAMMER: Jameson Cheong
+--
+-- INTERFACE: void inputProcess (int pipeIO[2], int pipeIT[2],pid_t pIOid, pid_t pITid)
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function gets the keyboard inputs and reads the input for processing. If character 'E' is pressed, the character write
+-- to output process and buffer write to translate process. If character 'T' is pressed, same as 'E' process with additional 
+-- signal to kill output procss and translate process. If chacter '^k' is pressed, all processes are killed. The rest characters
+-- write to output process.
+--
+----------------------------------------------------------------------------------------------------------------------*/
 void inputProcess (int pipeIO[2], int pipeIT[2],pid_t pIOid, pid_t pITid)
 {
 	char readInput;
@@ -118,6 +143,7 @@ void inputProcess (int pipeIO[2], int pipeIT[2],pid_t pIOid, pid_t pITid)
 				write (pipeIO[1], bufChar, 1);
 				write (pipeIT[1], buf, MSGSIZE);
 				read = 0;
+				sleep(1);
 				kill(pIOid,SIGUSR1);
 				kill(pITid,SIGUSR1);
 				break;
@@ -127,29 +153,47 @@ void inputProcess (int pipeIO[2], int pipeIT[2],pid_t pIOid, pid_t pITid)
 				kill(0,9);
 				break;
 			default:
-				buf[i++] = readInput;
 				bufChar[0] = readInput;
+				buf[i++] = readInput;
 				write (pipeIO[1], &readInput, 1);
 				break;
 		}
 		
 
 	}
-	sleep(1);
 	
 }
 
-/*------ Child Code --------------------*/
+/*------------------------------------------------------------------------------------------------------------------
+-- FUNCTION: outputProcess
+--
+-- DATE: January 15, 2020
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Jameson Cheong
+--
+-- PROGRAMMER: Jameson Cheong
+--
+-- INTERFACE: void outputProcess(int pipeIO[],int pipeOT[])
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function gets characters from inputs process and gets buffer form translate process. If character 'E' or 'T' received 
+-- from input process switch and process buffer from translate process. The rest of characters are printed on to the screen.
+--
+----------------------------------------------------------------------------------------------------------------------*/
 void outputProcess(int pipeIO[],int pipeOT[])
 {
 	int nread;
 	int pressedE = 0;
+	int startOutputPrint = 1;
 	char buf[MSGSIZE];
 	/* close the write descriptor */
 	close (pipeIO[1]); 
 	/* close the write descriptor */   
 	close (pipeOT[1]); 
-	printf ("Output: ");
 	while(!normalTermination)
 	{
 		if(!pressedE){
@@ -164,8 +208,19 @@ void outputProcess(int pipeIO[],int pipeOT[])
 							printf ("%c\n\r", buf[0]);
 							fflush(stdout);		
 							pressedE = 1;
+							startOutputPrint = 1;
+							break;
+						case 'T':
+							printf ("%c\n\r", buf[0]);
+							fflush(stdout);
+							pressedE = 1;
+							startOutputPrint = 1;
 							break;
 						default:
+							if(startOutputPrint){
+								printf ("Output: ");
+								startOutputPrint = 0;
+							}
 							printf ("%c", buf[0]);
 							fflush(stdout);
 							break;
@@ -183,14 +238,33 @@ void outputProcess(int pipeIO[],int pipeOT[])
 					printf ("Translate: ");
 					printf ("%s\n\r", buf);
 					pressedE = 0;
-					printf ("Output: ");
 					fflush(stdout);
 					break;
 			}
 		}
 	}
 }
-
+/*------------------------------------------------------------------------------------------------------------------
+-- FUNCTION: translateProcess
+--
+-- DATE: January 15, 2020
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Jameson Cheong
+--
+-- PROGRAMMER: Jameson Cheong
+--
+-- INTERFACE: void translateProcess(int pipeIT[2],int pipeOT[2])
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function gets characters from inputs process and sent translated buffer to output process. If character 'a' 
+-- received, the character is converted to 'z'. If character 'X' recieved, the last character is deleted. If character 'K'
+-- received, bufTranslate index is reset to zero to line-kill. The rest of characters are append to bufTranslate.
+--
+----------------------------------------------------------------------------------------------------------------------*/
 void translateProcess(int pipeIT[2],int pipeOT[2])
 {
 	char buf[MSGSIZE];
@@ -227,24 +301,18 @@ void translateProcess(int pipeIT[2],int pipeOT[2])
 							j=0;
 							break;
 						default:
-							
 							bufTranslate[j++] = buf[i];
 							break;			
 
 					}
-	
-					//printf ("MSG translate = %s", bufTranslate);
+
 				}
 				bufTranslate[j-1] = '\0';
 				write (pipeOT[1], bufTranslate, MSGSIZE);
-				fflush(stdout);
-				
-				
+				fflush(stdout);	
 		}
 	}
 
-	//printf("SIGUSR1 translate received.\n");
-	//system("stty -raw -igncr echo");
 }
 
 /*---------- Error function ------*/
@@ -252,6 +320,15 @@ void fatal (char *s)
 {
 	perror (s);    /* print error msg and die */
 	exit(1);
+}
+
+
+void readUsual(int sig)
+{
+    if (sig == SIGUSR1)
+    {
+        normalTermination = 1;
+    }
 }
 
 
