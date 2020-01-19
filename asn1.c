@@ -8,11 +8,10 @@
 
 #define MSGSIZE 		256
 #define abNormTermination 	0x0B
-#define endOfString   		00
 
 /*------ Function prototypes ----------*/
-void inputProcess(int pipeIO[], int pipeIT[], pid_t pid);
-void outputProcess(int p[]);
+void inputProcess(int pipeIO[], int pipeIT[], pid_t pIOid, pid_t pITid);
+void outputProcess(int pipeIO[],int pipeOT[]);
 void translateProcess(int pipeIT[],int pipeOT[]);
 void parent (int p[]);
 void child (int p[]);
@@ -37,7 +36,9 @@ int main (void)
 	pid_t pOutputid, pTranslateid;
 
 	signal(SIGUSR1,readUsual);
-
+	
+	system("stty raw igncr -echo"); //disable keyboard functionality
+	
 	/*----- Open the pipe -----------*/
 	if (pipe(pipeIO) < 0 || pipe(pipeIT) < 0 || pipe(pipeOT) < 0 )
 	{
@@ -47,7 +48,9 @@ int main (void)
 
 	/*---- Set the O_NDELAY flag for pipeIO[0] -----------*/
 	if (fcntl (pipeIO[0], F_SETFL, O_NDELAY) < 0)
-	  	fatal ("fcntl call");
+	  	fatal ("fcntl call for input and output");
+	if (fcntl (pipeIT[0], F_SETFL, O_NDELAY) < 0)
+	  	fatal ("fcntl call for input and translate");
 
 
 	/*-------- fork ---------------*/
@@ -59,7 +62,7 @@ int main (void)
 			break;
 
 		case 0:        /* It's the child */
-		  	outputProcess (pipeIO);
+		  	outputProcess (pipeIO, pipeOT);
 		default:       /* parent */
 		  	
 			pTranslateid = fork(); 
@@ -70,123 +73,177 @@ int main (void)
 					break;
 
 				case 0:        /* It's the child */
-				  	printf("translateProcess.\n");
+				  	//printf("translateProcess.\n");
 				  	translateProcess (pipeIT, pipeOT);
 				default:       /* parent */
-					inputProcess (pipeIO, pipeIT, pOutputid);
+					inputProcess (pipeIO, pipeIT, pOutputid, pTranslateid);
 			}
 	}
+	
+	system("stty -raw -igncr echo"); //return keyboard state.
 	return 0;
 }
 
 
-void inputProcess (int pipeIO[2], int pipeIT[2], pid_t pid)
+void inputProcess (int pipeIO[2], int pipeIT[2],pid_t pIOid, pid_t pITid)
 {
 	char readInput;
-	//char buf[MSGSIZE];
-	char bufChar[2];
+	char buf[MSGSIZE];
+	char bufChar[1];
 	int read = 1;
-	//int i = 0;
+	int i = 0;
 
 	/* close the read descriptor */
 	close (pipeIO[0]);  
 	close (pipeIT[0]);   
-	system("stty raw igncr -echo");
+	
 
 	while (read)
 	{
 		switch(readInput = getchar()){
 			
 			case 'E':
-				//buf[i++] = endOfString;
-				//write (pipeIO[1], buf, MSGSIZE);
-				//write (pipeIT[1], buf, MSGSIZE);
-				//i = 0;
+				bufChar[0] = readInput;
+				buf[i++] = readInput;
+				buf[i++] = '\0';
+				i = 0;
+				write (pipeIT[1], buf, MSGSIZE);
+				write (pipeIO[1], bufChar, 1);
 				break;
 			case 'T':
-				//buf[i++] = endOfString;
-				//write (pipeIO[1], buf, MSGSIZE);
-				//i = 0;
+				bufChar[0] = readInput;
+				buf[i++] = readInput;
+				buf[i++] = '\0';
+				i = 0;
+				write (pipeIO[1], bufChar, 1);
+				write (pipeIT[1], buf, MSGSIZE);
 				read = 0;
-				kill(pid,SIGUSR1);
+				kill(pIOid,SIGUSR1);
+				kill(pITid,SIGUSR1);
 				break;
 			case abNormTermination:
-				kill(pid,SIGUSR1);
+				kill(pIOid,SIGUSR1);
+				kill(pITid,SIGUSR1);
 				kill(0,9);
 				break;
 			default:
-				//buf[i++] = readInput;
+				buf[i++] = readInput;
 				bufChar[0] = readInput;
-				write (pipeIO[1], bufChar, 2);
+				write (pipeIO[1], bufChar, 1);
 				break;
 		}
+		
 
 	}
-	system("stty -raw -igncr echo");
+	sleep(1);
+
 	//printf("Terminate Parent Process.\n");	
-	exit(0);
 }
 
 /*------ Child Code --------------------*/
-void outputProcess (int p[2])
+void outputProcess(int pipeIO[],int pipeOT[])
 {
 	int nread;
+	int pressedE = 0;
 	char buf[MSGSIZE];
-
-	close (p[1]);    /* close the write descriptor */
+	/* close the write descriptor */
+	close (pipeIO[1]); 
+	/* close the write descriptor */   
+	close (pipeOT[1]); 
 	printf ("Output: ");
 	while(!normalTermination)
 	{
-		switch (nread = read(p[0], buf, MSGSIZE))
-		{
-		  case -1:
-		  case 0:
-		  	break;
-		default:
-			printf ("%s", buf);
-			fflush(stdout);
+		if(!pressedE){
+			switch (nread = read(pipeIO[0], buf, MSGSIZE))
+			{
+				case -1:
+				case 0:
+					break;
+				default:
+					switch(buf[0]){
+					
+						case 'E':
+							printf ("%s\n\r", buf);
+							fflush(stdout);
+							
+							pressedE = 1;
+							break;
+						default:
+							printf ("%s", buf);
+							fflush(stdout);
+							break;
+
+					}
+					break;
+			}
+		}else{
+			switch (nread = read(pipeOT[0], buf, MSGSIZE))
+			{
+				case -1:
+				case 0:
+					break;
+				default:
+					printf ("Translate: ");
+					printf ("%s\n\r", buf);
+					fflush(stdout);
+					pressedE = 0;
+					printf ("Output: ");
+					break;
+			}
 		}
 	}
-	//printf("SIGUSR1 received.\n");
-	//system("stty -raw -igncr echo");
 }
 
 void translateProcess(int pipeIT[2],int pipeOT[2])
 {
 	char buf[MSGSIZE];
 	int nread;
+	
 	char bufTranslate[MSGSIZE];
-	char letterA = 'a';
+	int i = 0;
+	int j = 0;
+	
 	/* close the write descriptor */
 	close (pipeIT[1]); 
-	close (pipeOT[1]);   
-
+	/* close the read descriptor */
+	close (pipeOT[0]);   
+	//printf("translateProcess.\n");
 	while(!normalTermination)
 	{
 		switch (nread = read(pipeIT[0], buf, MSGSIZE))
 		{
-		  case -1:
-		  case 0:
-			break;
-		  break;
-		default:
-			for(int j = 0;j != '\0'; j++){
-				switch(buf[j]){
-					case 'a':	
-						bufTranslate[j] = letterA;
-					case 'X':
-						bufTranslate[strlen(bufTranslate)-1] = 0;
-						break;
-					case 'E':
-						break;
-					default:
-						break;			
+		  	case -1:
+		  	case 0:
+		  		
+				break;
+			default:
+				
+				for(i = 0, j = 0; buf[i]!='\0'; i++){	
+					switch(buf[i]){
+						case 'a':	
+							
+							bufTranslate[i++] = 'z';
+						case 'X':
+							j = (j > 0) ? j - 1 : 0;
+							break;
+						default:
+							
+							bufTranslate[j++] = buf[i];
+							//printf ("%s", bufTranslate);
+							//fflush(stdout);
+							break;			
+
+					}
+	
+					//printf ("MSG translate = %s", bufTranslate);
 				}
-			}
-			printf ("MSG translate = %s", bufTranslate);
+				bufTranslate[j-1] = '\0';
+				write (pipeOT[1], bufTranslate, MSGSIZE);
+				
 		}
 	}
-	//printf("SIGUSR1 received.\n");
+
+	//printf("SIGUSR1 translate received.\n");
 	//system("stty -raw -igncr echo");
 }
 
