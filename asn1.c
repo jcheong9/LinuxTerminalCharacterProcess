@@ -73,7 +73,6 @@ int main (void)
 					break;
 
 				case 0:        /* It's the child */
-				  	//printf("translateProcess.\n");
 				  	translateProcess (pipeIT, pipeOT);
 				default:       /* parent */
 					inputProcess (pipeIO, pipeIT, pOutputid, pTranslateid);
@@ -107,8 +106,9 @@ void inputProcess (int pipeIO[2], int pipeIT[2],pid_t pIOid, pid_t pITid)
 				buf[i++] = readInput;
 				buf[i++] = '\0';
 				i = 0;
-				write (pipeIT[1], buf, MSGSIZE);
 				write (pipeIO[1], bufChar, 1);
+				write (pipeIT[1], buf, MSGSIZE);
+				buf[i] = '\0';
 				break;
 			case 'T':
 				bufChar[0] = readInput;
@@ -129,15 +129,14 @@ void inputProcess (int pipeIO[2], int pipeIT[2],pid_t pIOid, pid_t pITid)
 			default:
 				buf[i++] = readInput;
 				bufChar[0] = readInput;
-				write (pipeIO[1], bufChar, 1);
+				write (pipeIO[1], &readInput, 1);
 				break;
 		}
 		
 
 	}
 	sleep(1);
-
-	//printf("Terminate Parent Process.\n");	
+	
 }
 
 /*------ Child Code --------------------*/
@@ -161,15 +160,13 @@ void outputProcess(int pipeIO[],int pipeOT[])
 					break;
 				default:
 					switch(buf[0]){
-					
 						case 'E':
-							printf ("%s\n\r", buf);
-							fflush(stdout);
-							
+							printf ("%c\n\r", buf[0]);
+							fflush(stdout);		
 							pressedE = 1;
 							break;
 						default:
-							printf ("%s", buf);
+							printf ("%c", buf[0]);
 							fflush(stdout);
 							break;
 
@@ -185,9 +182,9 @@ void outputProcess(int pipeIO[],int pipeOT[])
 				default:
 					printf ("Translate: ");
 					printf ("%s\n\r", buf);
-					fflush(stdout);
 					pressedE = 0;
 					printf ("Output: ");
+					fflush(stdout);
 					break;
 			}
 		}
@@ -207,7 +204,7 @@ void translateProcess(int pipeIT[2],int pipeOT[2])
 	close (pipeIT[1]); 
 	/* close the read descriptor */
 	close (pipeOT[0]);   
-	//printf("translateProcess.\n");
+	
 	while(!normalTermination)
 	{
 		switch (nread = read(pipeIT[0], buf, MSGSIZE))
@@ -221,8 +218,7 @@ void translateProcess(int pipeIT[2],int pipeOT[2])
 				for(i = 0, j = 0; buf[i]!='\0'; i++){	
 					switch(buf[i]){
 						case 'a':	
-							
-							bufTranslate[i++] = 'z';
+							bufTranslate[j++] = 'z';
 						case 'X':
 							j = (j > 0) ? j - 1 : 0;
 							break;
@@ -230,7 +226,7 @@ void translateProcess(int pipeIT[2],int pipeOT[2])
 							
 							bufTranslate[j++] = buf[i];
 							//printf ("%s", bufTranslate);
-							//fflush(stdout);
+							
 							break;			
 
 					}
@@ -239,6 +235,8 @@ void translateProcess(int pipeIT[2],int pipeOT[2])
 				}
 				bufTranslate[j-1] = '\0';
 				write (pipeOT[1], bufTranslate, MSGSIZE);
+				fflush(stdout);
+				
 				
 		}
 	}
