@@ -219,6 +219,7 @@ void translateProcess(int pipeIT[2],int pipeOT[2])
 					switch(buf[i]){
 						case 'a':	
 							bufTranslate[j++] = 'z';
+							break;
 						case 'X':
 							j = (j > 0) ? j - 1 : 0;
 							break;
